@@ -1,5 +1,5 @@
 defmodule Dummy.OrderFsm do
-  use EctoStateMachine,
+  use AsFsm,
     column: :status,
     states: [:new, :pending, :accepted, :delivering, :closed, :cancelled],
     events: [

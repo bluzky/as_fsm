@@ -1,74 +1,101 @@
-# Ecto state machine
+# Elixir Finite state machine
 
-![travis ci badge](https://travis-ci.org/asiniy/ecto_state_machine.svg)
-![badge](https://img.shields.io/hexpm/v/ecto_state_machine.svg)
 
-This package allows to use [finite state machine pattern](https://en.wikipedia.org/wiki/Finite-state_machine) in Ecto. Specify:
+This package allows to use [finite state machine pattern](https://en.wikipedia.org/wiki/Finite-state_machine) in elixir. 
 
-* states
-* events
-* column ([optional](#custom-column-name))
+## 1. Usage
 
-and go:
+Define your FSM
 
 ``` elixir
-defmodule User do
-  use Web, :model
+defmodule OrderState do
 
+  # define state, event and transition 
   use EctoStateMachine,
-    states: [:unconfirmed, :confirmed, :blocked, :admin],
+    states: [:new, :processing, :cancelled, :delivered],
     events: [
-      [
-        name:     :confirm,
-        from:     [:unconfirmed],
-        to:       :confirmed,
-        callback: fn(model) -> Ecto.Changeset.change(model, confirmed_at: Ecto.DateTime.utc) end # yeah you can bring your own code to these functions.
-      ], [
-        name:     :block,
-        from:     [:confirmed, :admin],
-        to:       :blocked
-      ], [
-        name:     :make_admin,
-        from:     [:confirmed],
-        to:       :admin
+      confirm: [
+        name:     "Confirm",
+        from:     [:new],
+        to:       :processing,
+        on_transition: fn(model, params) -> 
+        # do something
+        {:ok, model}
+        end
+      ], 
+      deliver: [
+        name:     "Deliver",
+        from:     [:processing],
+        to:       :delivered
+      ], 
+      cancel: [
+        name:     "Cancel order",
+        from:     [:new, :processing],
+        to:       :cancelled,
+        on_transition: &update_stock/2
       ]
     ]
-
-  schema "users" do
-    field :state, :string, default: "unconfirmed"
-  end
+    
+    # define your callback function
+    def update_stock(model, params)  do
+      # your code
+    end
 end
+
 ```
 
-now you can do:
-
-``` elixir
-user = Repo.get_by(User, id: 1)
-
-# Create changeset transition user state to "confirmed". We can make him admin!
-confirmed_user = User.confirm(user)     # =>
-
-# We can validate ability to change user's state
-User.can_confirm?(confirmed_user)       # => false
-User.can_make_admin?(confirmed_user)    # => true
-
-# Create changeset transition user state to "admin"
-admin = User.make_admin(confirmed_user)
-
-# Store changeset to the database
-Repo.update(admin)                      
-
-
-# List all possible states
-# If column isn't `:state`, function name will be prefixed. IE,
-# for column `:rules` function name will be `rules_states`
-User.states # => [:unconfirmed, :confirmed, :blocked, :admin]
-
-# List all possible events
-# If column isn't `:state`, function name will be prefixed. IE,
-# for column `:rules` function name will be `rules_events`
-User.events # => [:confirm, :block, :make_admin]
+**list all state** 
+```elixir
+#> OrderState.states()
+#> [:new, :processing, :cancelled, :delivered]
 ```
+
+**list all event** 
+```elixir
+#> OrderState.events()
+#> [{:confirm, "Confirm"}, {:deliver, "Deliver"}, {:cancel, "Cancel Order"}]
+```
+
+**Check if can accept event**
+```elixir
+#> model = %{status: :new}
+#> OrderState.can?(model, :confirm)
+#> true
+#> OrderState.can?(model, :cancel)
+#> true
+#> OrderState.can?(model, :deliver)
+#> false
+```
+
+**Get accepted events**
+All events that can used to trigger a transition
+
+```elixir
+#> model = %{status: :new}
+#> OrderState.accepted_events(model)
+#> [{:confirm, "Confirm"}, {:cancel, "Cancel order"}]
+```
+
+**Trigger an event**
+
+```elixir
+#> model = %{status: :new}
+#> OrderState.confirm(model)
+#> %{status: :processing}
+#> # you can even pass data when trigger event
+#> OrderState.confirm(model, %{message: "oke man"})
+```
+
+**Dynamic trigger event**
+
+```elixir
+#> model = %{status: :new}
+#> OrderState.trigger(model, :confirm)
+#> %{status: :processing}
+#> # you can even pass data when trigger event
+#> OrderState.trigger(model, :confirm, %{message: "oke man"})
+```
+
 
 You can check out whole `test/dummy` directory to inspect how to organize sample app.
 

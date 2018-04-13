@@ -1,4 +1,4 @@
-defmodule EctoStateMachine do
+defmodule AsFsm do
   @doc """
   """
 
