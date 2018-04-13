@@ -4,6 +4,17 @@ This package is inspired by [ecto_fsm](https://github.com/bluzky/ecto_fsm) packa
 
 This package allows to use [finite state machine pattern](https://en.wikipedia.org/wiki/Finite-state_machine) in elixir. 
 
+
+**Install**
+
+```elixir
+def deps do
+  [
+    {:as_fsm, "~> 0.1.0"}
+  ]
+end
+```
+
 ## 1. Usage
 
 Define your FSM
