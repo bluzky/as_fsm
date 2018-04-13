@@ -4,7 +4,7 @@ defmodule AsFsm.Mixfile do
   def project do
     [
       app: :as_fsm,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -17,7 +17,7 @@ defmodule AsFsm.Mixfile do
   def package do
     [
       name: :as_fsm,
-      files: ["lib", "mix.exs"],
+      files: ["lib", "mix.exs", "README*"],
       maintainers: ["Dung Nguyen"],
       licenses: ["MIT"],
       links: %{"Github" => "https://github.com/bluzky/as_fsm"}
