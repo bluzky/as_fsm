@@ -12,7 +12,7 @@ Define your FSM
 defmodule OrderState do
 
   # define state, event and transition 
-  use EctoStateMachine,
+  use AsFsm,
     states: [:new, :processing, :cancelled, :delivered],
     events: [
       confirm: [
