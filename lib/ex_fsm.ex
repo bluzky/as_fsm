@@ -72,7 +72,7 @@ defmodule AsFsm do
       end
 
       def accepted_events(model) do
-        current_state = Map.get(model, unquote(column), [])
+        current_state = Map.get(model, unquote(column), []) |> ensure_atom
 
         unquote(events)
         |> Enum.filter(fn {_, transition} -> current_state in transition[:from] end)
@@ -80,7 +80,7 @@ defmodule AsFsm do
       end
 
       def can?(model, event) when is_atom(event) do
-        current_state = Map.get(model, unquote(column), [])
+        current_state = Map.get(model, unquote(column), []) |> ensure_atom
 
         Enum.find_value(unquote(events), false, fn {evt_name, transition} = evt ->
           event == evt_name and current_state in transition[:from]
@@ -88,6 +88,14 @@ defmodule AsFsm do
       end
 
       def can?(_, _), do: false
+			
+			defp ensure_atom(key)do
+				cond do
+					is_atom(key) -> key
+					is_string(key) -> String.to_atom(key)
+					true -> raise "Invalid key type"
+				end
+			end
     end
   end
 end
