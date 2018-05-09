@@ -30,10 +30,15 @@ defmodule OrderState do
         name:     "Confirm",
         from:     [:new],
         to:       :processing,
-        on_transition: fn(model, params) -> 
+        on_transition: (fn(model, params) -> 
         # do something
         {:ok, model}
-        end
+        end),
+        on_enter: (fn(model, params) -> #do_something end),
+        guard: (fn(model, params) -> 
+        # do some check here
+        true # return true to allow transition, false to abort
+        end)
       ], 
       deliver: [
         name:     "Deliver",
