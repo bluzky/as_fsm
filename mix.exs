@@ -4,7 +4,7 @@ defmodule AsFsm.Mixfile do
   def project do
     [
       app: :as_fsm,
-      version: "0.1.1",
+      version: "0.1.3",
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

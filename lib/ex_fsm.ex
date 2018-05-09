@@ -16,7 +16,11 @@ defmodule AsFsm do
         {event, transition}
       end)
       |> Enum.map(fn {event, transition} ->
-        transition = Keyword.update!(transition, :on_transition, &Macro.escape/1)
+        transition =
+					transition
+					|> Keyword.update!(:on_transition, &Macro.escape/1)
+					|> Keyword.update(:guard, nil, &Macro.escape/1)
+					|> Keyword.update(:on_enter, nil, &Macro.escape/1)
         {event, transition}
       end)
 
@@ -40,20 +44,10 @@ defmodule AsFsm do
           raise "Target state :#{transition[:to]} is not present in ecto_state_machine definition states"
         end
 
-        def unquote(event)(model), do: unquote(event)(model, %{})
+        def unquote(event)(model), do: trigger(model, unquote(event), %{})
 
         def unquote(event)(model, params) do
-          if can?(model, unquote(event)) do
-            case unquote(transition[:on_transition]).(model, params) do
-              {:ok, model} ->
-                {:ok, %{model | "#{unquote(column)}": unquote(transition[:to])}}
-
-              err ->
-                err
-            end
-          else
-            {:error, "Current state does not accept event #{unquote(event)}"}
-          end
+          trigger(model, unquote(event), params)
         end
 
         def unquote(:"can_#{event}?")(model) do
@@ -63,9 +57,30 @@ defmodule AsFsm do
 
       def trigger(model, event, params \\ %{}) do
         event_names = unquote(Enum.map(events, &elem(&1, 0)))
+				events = unquote(events)
 
         if event in event_names do
-          apply(__MODULE__, event, [model, params])
+					transition = events[event]
+					
+          if can?(model, event) do
+						if is_nil(transition[:guard]) or transition[:guard].(model, params) do
+            	case transition[:on_transition].(model, params) do
+              	{:ok, model} ->
+									
+									# trigger on_enter state hook
+									if not is_nil(transition[:on_enter]), do: transition[:on_enter].(model, params)
+									
+                	{:ok, %{model | "#{unquote(column)}": transition[:to]}}
+              	err ->
+                	err
+            	end
+						else
+							{:abort, "Guard validation failed"}
+						end
+          else
+            {:error, "Current state does not accept event #{event}"}
+          end
+          # apply(__MODULE__, event, [model, params])
         else
           raise "Event does not exist"
         end
@@ -92,7 +107,7 @@ defmodule AsFsm do
 			defp ensure_atom(key)do
 				cond do
 					is_atom(key) -> key
-					is_string(key) -> String.to_atom(key)
+					is_binary(key) -> String.to_atom(key)
 					true -> raise "Invalid key type"
 				end
 			end
