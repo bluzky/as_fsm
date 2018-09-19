@@ -4,7 +4,7 @@ defmodule AsFsm.Mixfile do
   def project do
     [
       app: :as_fsm,
-      version: "0.1.3",
+      version: "0.2.0",
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -39,7 +39,7 @@ defmodule AsFsm.Mixfile do
   defp deps do
     [
       {:earmark, ">= 0.0.0", only: :dev},
-      {:ex_doc, ">= 0.0.0", only: :dev}
+      {:ex_doc, ">= 0.18.0", only: :dev}
     ]
   end
 end
