@@ -1,116 +1,145 @@
 defmodule AsFsm do
+  defmacro __using__(opts) do
+    column = opts[:column] || :state
+
+    quote do
+      import AsFsm
+      @column unquote(column)
+      @states []
+      @events %{}
+
+      @before_compile AsFsm
+    end
+  end
+
+  defmodule Event do
+    defstruct key: nil, name: nil, from: [], to: nil, guard: nil
+  end
+
+  defmacro def_event(event_id, opts \\ []) do
+    from = Keyword.get(opts, :from)
+    to = Keyword.get(opts, :to)
+    guard = Keyword.get(opts, :when)
+    name = Keyword.get(opts, :name)
+
+    if is_nil(from) do
+      raise ArgumentError, message: ":from options is required"
+    end
+
+    if is_nil(to) do
+      raise ArgumentError, message: ":to options is required"
+    end
+
+    from = if is_atom(from), do: [from], else: from
+
+    event =
+      Macro.escape(%Event{
+        key: event_id,
+        from: from,
+        to: to,
+        guard: guard,
+        name: name
+      })
+
+    quote do
+      @states [unquote(event_id) | @states]
+      @events Map.put(@events, unquote(event_id), unquote(event))
+    end
+  end
+
   @doc """
+  guard function receiver 2 params, first is object, second params is additional params
+  it should return
+  :ok if success
+  {:error, error_message} if failed
   """
 
-  defmacro __using__(opts) do
-    column = Keyword.get(opts, :column, :status)
-    function_prefix = Keyword.get(opts, :prefix, "")
-    sm_states = Keyword.get(opts, :states)
-
-    events =
-      Keyword.get(opts, :events)
-      |> Enum.map(fn {event, transition} ->
-        transition =
-          Keyword.put_new(transition, :on_transition, quote(do: fn model, _ -> {:ok, model} end))
-
-        {event, transition}
-      end)
-      |> Enum.map(fn {event, transition} ->
-        transition =
-					transition
-					|> Keyword.update!(:on_transition, &Macro.escape/1)
-					|> Keyword.update(:guard, nil, &Macro.escape/1)
-					|> Keyword.update(:on_enter, nil, &Macro.escape/1)
-        {event, transition}
-      end)
-
-    quote bind_quoted: [
-            sm_states: sm_states,
-            events: events,
-            column: column,
-            function_prefix: function_prefix
-          ] do
-      def unquote(:"#{function_prefix}states")() do
-        unquote(sm_states)
+  defmacro __before_compile__(_env) do
+    quote do
+      def states() do
+        @states
       end
 
-      def unquote(:"#{function_prefix}events")() do
-        unquote(events) |> Enum.map(fn {evt, transition} -> {evt, transition[:name]} end)
+      def events() do
+        Enum.map(@events, fn {key, event} -> {key, event.name} end)
+        |> Enum.into(%{})
       end
 
-      events
-      |> Enum.each(fn {event, transition} ->
-        unless transition[:to] in sm_states do
-          raise "Target state :#{transition[:to]} is not present in ecto_state_machine definition states"
-        end
+      def can?(event_id, object, params \\ nil) do
+        from = :"#{Map.get(object, :state)}"
+        event = @events[event_id]
 
-        def unquote(event)(model), do: trigger(model, unquote(event), %{})
-
-        def unquote(event)(model, params) do
-          trigger(model, unquote(event), params)
-        end
-
-        def unquote(:"can_#{event}?")(model) do
-          :"#{Map.get(model, unquote(column))}" in unquote(transition[:from])
-        end
-      end)
-
-      def trigger(model, event, params \\ %{}) do
-        event_names = unquote(Enum.map(events, &elem(&1, 0)))
-				events = unquote(events)
-
-        if event in event_names do
-					transition = events[event]
-					
-          if can?(model, event) do
-						if is_nil(transition[:guard]) or transition[:guard].(model, params) do
-            	case transition[:on_transition].(model, params) do
-              	{:ok, model} ->
-									
-									# trigger on_enter state hook
-									if not is_nil(transition[:on_enter]), do: transition[:on_enter].(model, params)
-									
-                	{:ok, %{model | "#{unquote(column)}": transition[:to]}}
-              	err ->
-                	err
-            	end
-						else
-							{:abort, "Guard validation failed"}
-						end
+        with false <- is_nil(event),
+             true <- from in event.from do
+          if event.guard do
+            apply(__MODULE__, event.guard, [object, params])
           else
-            {:error, "Current state does not accept event #{event}"}
+            :ok
           end
-          # apply(__MODULE__, event, [model, params])
         else
-          raise "Event does not exist"
+          true -> {:error, :event_undefined}
+          _ -> {:error, :invalid_state}
         end
       end
 
-      def accepted_events(model) do
-        current_state = Map.get(model, unquote(column), []) |> ensure_atom
+      def available_events(object) do
+        state = :"#{Map.get(object, :state)}"
 
-        unquote(events)
-        |> Enum.filter(fn {_, transition} -> current_state in transition[:from] end)
-        |> Enum.map(fn {event, transition} -> {event, transition[:name]} end)
-      end
-
-      def can?(model, event) when is_atom(event) do
-        current_state = Map.get(model, unquote(column), []) |> ensure_atom
-
-        Enum.find_value(unquote(events), false, fn {evt_name, transition} = evt ->
-          event == evt_name and current_state in transition[:from]
+        Enum.filter(@events, fn {_, event} -> state in event.from end)
+        |> Enum.map(fn {key, event} ->
+          {key, event.name}
         end)
+        |> Enum.into(%{})
       end
 
-      def can?(_, _), do: false
-			
-			defp ensure_atom(key)do
-				cond do
-					is_atom(key) -> key
-					is_binary(key) -> String.to_atom(key)
-					true -> raise "Invalid key type"
-				end
-			end
+      def trigger(event_id, object, args \\ nil) do
+        event = @events[event_id]
+        handler_name = :"on_#{event_id}"
+
+        with false <- is_nil(event),
+             true <- :erlang.function_exported(__MODULE__, handler_name, 2),
+             :ok <- can?(event_id, object, args) do
+          apply(__MODULE__, handler_name, [object, args])
+        else
+          true ->
+            {:error, :event_undefined}
+
+          false ->
+            {:error, :handler_undefined}
+
+          err ->
+            err
+        end
+      end
+
+      def blind_trigger(event_id, object, args \\ nil) do
+        event = @events[event_id]
+        handler_name = :"on_#{event_id}"
+
+        with false <- is_nil(event),
+             true <- :erlang.function_exported(__MODULE__, handler_name, 2) do
+          apply(__MODULE__, handler_name, [object, args])
+        else
+          true ->
+            {:error, :event_undefined}
+
+          false ->
+            {:error, :handler_undefined}
+
+          err ->
+            err
+        end
+      end
+
+      def next_state(event_id) do
+        event = @events[event_id]
+
+        if event do
+          event.to
+        else
+          :event_undefined
+        end
+      end
     end
   end
 end

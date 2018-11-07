@@ -5,12 +5,13 @@ This package is inspired by [ecto_fsm](https://github.com/bluzky/ecto_fsm) packa
 This package allows to use [finite state machine pattern](https://en.wikipedia.org/wiki/Finite-state_machine) in elixir. 
 
 
+> I have rewritten this library to make code simple and easier to use
 **Install**
 
 ```elixir
 def deps do
   [
-    {:as_fsm, "~> 0.1.0"}
+    {:as_fsm, "~> 1.0.0"}
   ]
 end
 ```
@@ -20,45 +21,23 @@ end
 Define your FSM
 
 ``` elixir
-defmodule OrderState do
+defmodule TestFsm do
+  use AsFsm
 
-  # define state, event and transition 
-  use AsFsm,
-    states: [:new, :processing, :cancelled, :delivered],
-    events: [
-      confirm: [
-        name:     "Confirm",
-        from:     [:new],
-        to:       :processing,
-        on_transition: (fn(model, params) -> 
-        # do something
-        {:ok, model}
-        end),
-        on_enter: (fn(model, params) -> #do_something end),
-        guard: (fn(model, params) -> 
-        # do some check here
-        true # return true to allow transition, false to abort
-        end)
-      ], 
-      deliver: [
-        name:     "Deliver",
-        from:     [:processing],
-        to:       :delivered
-      ], 
-      cancel: [
-        name:     "Cancel order",
-        from:     [:new, :processing],
-        to:       :cancelled,
-        on_transition: &update_stock/2
-      ]
-    ]
-    
-    # define your callback function
-    def update_stock(model, params)  do
-      # your code
-    end
+  def_event(:start, from: :idle, to: :running, name: "Start event", when: :check_it)
+  def_event(:pause, from: :running, to: :paused, name: "Pause", when: :check_it)
+  def_event(:stop, from: [:running, :paused], to: :idle, name: "Stop", when: :check_it)
+
+  def check_it(object, params) do
+    :ok
+  end
+
+  def on_start(object, params) do
+    IO.inspect(object)
+    IO.inspect(params)
+    {:ok, object}
+  end
 end
-
 ```
 
 **list all state** 
@@ -75,12 +54,12 @@ end
 
 **Check if can accept event**
 ```elixir
-#> model = %{status: :new}
-#> OrderState.can?(model, :confirm)
+#> model = %{state: :new}
+#> OrderState.can?(:confirm, model)
 #> true
-#> OrderState.can?(model, :cancel)
+#> OrderState.can?(:cancel, model)
 #> true
-#> OrderState.can?(model, :deliver)
+#> OrderState.can?(:deliver, model)
 #> false
 ```
 
@@ -88,38 +67,28 @@ end
 All events that can used to trigger a transition
 
 ```elixir
-#> model = %{status: :new}
-#> OrderState.accepted_events(model)
+#> model = %{state: :new}
+#> OrderState.available_events(model)
 #> [{:confirm, "Confirm"}, {:cancel, "Cancel order"}]
 ```
 
 **Trigger an event**
 
 ```elixir
-#> model = %{status: :new}
-#> OrderState.confirm(model)
-#> %{status: :processing}
+#> model = %{state: :new}
+#> OrderState.trigger(:confirm, model)
+#> %{state: :processing}
 #> # you can even pass data when trigger event
-#> OrderState.confirm(model, %{message: "oke man"})
-```
-
-**Dynamic trigger event**
-
-```elixir
-#> model = %{status: :new}
-#> OrderState.trigger(model, :confirm)
-#> %{status: :processing}
-#> # you can even pass data when trigger event
-#> OrderState.trigger(model, :confirm, %{message: "oke man"})
+#> OrderState.trigger(:confirm, model, %{message: "oke man"})
 ```
 
 ## Options
 
-- Custom property name
+- Custom property name by default property name is :state
 ```elixir
 defmodule ExampleFsm do
 
   use AsFsm,
-    column: :state,
+    column: :status,
 end
 ```
