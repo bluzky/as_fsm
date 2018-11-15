@@ -41,7 +41,7 @@ end
 ```
 
 **list all state** 
-```elixir
+```shell
 #> OrderState.states()
 #> [:new, :processing, :cancelled, :delivered]
 ```

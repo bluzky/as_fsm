@@ -4,13 +4,17 @@ defmodule AsFsm.Mixfile do
   def project do
     [
       app: :as_fsm,
-      version: "0.2.0",
+      version: "1.0.0",
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
-      description: "An Finite state machine implementation for elixir"
+      description: "An Finite state machine implementation for elixir",
+      docs: [
+        main: "readme",
+        extras: ["README.md"]
+      ]
     ]
   end
 
