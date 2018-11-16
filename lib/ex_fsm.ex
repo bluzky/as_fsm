@@ -66,7 +66,7 @@ defmodule AsFsm do
       end
 
       def can?(event_id, object, params \\ nil) do
-        from = :"#{Map.get(object, :state)}"
+        from = :"#{Map.get(object, column)}"
         event = @events[event_id]
 
         with false <- is_nil(event),
@@ -83,7 +83,7 @@ defmodule AsFsm do
       end
 
       def available_events(object) do
-        state = :"#{Map.get(object, :state)}"
+        state = :"#{Map.get(object, column)}"
 
         Enum.filter(@events, fn {_, event} -> state in event.from end)
         |> Enum.map(fn {key, event} ->
