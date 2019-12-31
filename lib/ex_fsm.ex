@@ -21,6 +21,7 @@ defmodule AsFsm do
     to = Keyword.get(opts, :to)
     guard = Keyword.get(opts, :when)
     name = Keyword.get(opts, :name)
+    name = Macro.expand(name, __CALLER__)
 
     if is_nil(from) do
       raise ArgumentError, message: ":from options is required"
@@ -32,18 +33,17 @@ defmodule AsFsm do
 
     from = if is_atom(from), do: [from], else: from
 
-    event =
-      Macro.escape(%Event{
-        key: event_id,
-        from: from,
-        to: to,
-        guard: guard,
-        name: name
-      })
-
     quote do
-      @states [unquote(event_id) | @states]
-      @events Map.put(@events, unquote(event_id), unquote(event))
+      event = %Event{
+        key: unquote(event_id),
+        from: unquote(from),
+        to: unquote(to),
+        guard: unquote(guard),
+        name: unquote(name)
+      }
+
+      @states [event.key | @states]
+      @events Map.put(@events, event.key, event)
     end
   end
 
@@ -66,7 +66,7 @@ defmodule AsFsm do
       end
 
       def can?(event_id, object, params \\ nil) do
-        from = :"#{Map.get(object, column)}"
+        from = :"#{Map.get(object, @column)}"
         event = @events[event_id]
 
         with false <- is_nil(event),
@@ -83,7 +83,7 @@ defmodule AsFsm do
       end
 
       def available_events(object) do
-        state = :"#{Map.get(object, column)}"
+        state = :"#{Map.get(object, @column)}"
 
         Enum.filter(@events, fn {_, event} -> state in event.from end)
         |> Enum.map(fn {key, event} ->
