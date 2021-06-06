@@ -43,7 +43,8 @@ defmodule AsFsm.Mixfile do
   defp deps do
     [
       {:earmark, ">= 0.0.0", only: :dev},
-      {:ex_doc, ">= 0.18.0", only: :dev}
+      {:ex_doc, ">= 0.18.0", only: :dev},
+      {:ecto, ">= 3.6.0", optional: true}
     ]
   end
 end
