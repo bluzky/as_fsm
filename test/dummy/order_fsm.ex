@@ -1,5 +1,5 @@
 defmodule Dummy.OrderFsm do
-  use AsFsm, column: :status
+  use AsFsm, column: :status, repo: Repo
 
   defevent(:assign, from: :new, to: :pending)
   defevent(:accept, from: :pending, to: :accepted)
@@ -20,7 +20,7 @@ defmodule Dummy.OrderFsm do
     {:ok, context}
   end
 
-  def persist(_order, _status) do
+  def persist(_order, _status, _) do
     {:ok, :succeeded}
   end
 end
