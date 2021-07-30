@@ -1,4 +1,4 @@
-defmodule AsFsm do
+defmodule EsFsm do
   defmacro __using__(opts) do
     column = opts[:column] || :state
 

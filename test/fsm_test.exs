@@ -1,78 +1,57 @@
 defmodule EctoStateMachineTest do
   use ExUnit.Case, async: true
-
   alias Dummy.OrderFsm
 
-  setup_all do
-    {
-      :ok,
-      new_order: %{status: :new},
-      pending_order: %{status: :pending},
-      cancelled_order: %{status: :cancelled},
-      accepted_order: %{status: :accepted},
-      delivering_order: %{status: :delivering},
-      completed_order: %{status: :completed}
-    }
-  end
-
   describe "events" do
-    test "list all states", context do
-      assert length(OrderFsm.states()) == 6
+    test "list all events" do
+      events = OrderFsm.list_events()
+      assert length(events) == 5
+      assert :assign in events
     end
 
-    test "list all events", context do
-      events = OrderFsm.events()
-      assert length(events) == 6
-      assert List.first(events) == {:assign, "Assign"}
+    test "list event from existing state which have available event" do
+      events = OrderFsm.list_events(:new)
+      assert Enum.member?(events, :assign)
+      assert Enum.member?(events, :reject)
     end
 
-    test "#assigns", context do
-      data = context[:new_order]
-
-      assert OrderFsm.can?(data, :assign) == true
-      assert OrderFsm.can?(data, :accept) == false
-      assert OrderFsm.can?(data, :reject) == false
-
-      {status, data1} = OrderFsm.assign(data)
-      assert status == :ok
-      assert data1.status == :pending
-
-      {status, _} = OrderFsm.reject(data)
-      assert status == :error
-
-      {status, _} = OrderFsm.reject(data)
-      assert status == :error
+    test "list event from existing state which have no available event" do
+      events = OrderFsm.list_events(:cancelled)
+      assert events == []
     end
 
-    test "trigger event by right name", context do
-      data = context[:pending_order]
-
-      {rc, cancelled_order} = OrderFsm.trigger(data, :reject)
-      assert rc == :ok
-      assert cancelled_order.status == :cancelled
+    test "list event from undefined state" do
+      events = OrderFsm.list_events(:hello)
+      assert events == []
     end
 
-    test "trigger event by wrong name", context do
-      data = context[:pending_order]
-
-      {rc, _} = OrderFsm.trigger(data, :assign)
-      assert rc == :error
+    test "get event with exising event" do
+      assert {:ok, %{key: :assign}} = OrderFsm.get_event(:assign)
+      assert {:ok, %{key: :accept}} = OrderFsm.get_event(:accept)
     end
 
-    test "trigger not exist event", context do
-      data = context[:pending_order]
-
-      {rc, _} = OrderFsm.trigger(data, :dum)
-      assert rc == :error
+    test "get event with undefined event" do
+      assert {:error, :event_undefined} = OrderFsm.get_event(:hello)
     end
 
-    test "get accepted event for current state", context do
-      data = context[:pending_order]
+    test "check has event with current state" do
+      assert OrderFsm.can(:accept, :pending) == :ok
+    end
 
-      accepted_events = OrderFsm.accepted_events(data)
+    test "check has event failed with no " do
+      assert {:error, :invalid_state} = OrderFsm.can(:accept, :new)
+    end
 
-      assert length(accepted_events) == 2
-      assert List.first(accepted_events) == {:accept, "Accept"}
+    test "check has event failed with undefined event" do
+      assert {:error, :event_undefined} = OrderFsm.can(:hello, :new)
+    end
+
+    test "check has transaction between 2 event with transition" do
+      assert OrderFsm.has_transition?(:new, :pending)
+    end
+
+    test "check has transaction between 2 event with no transition" do
+      assert OrderFsm.has_transition?(:new, :accept) == false
     end
   end
 end
